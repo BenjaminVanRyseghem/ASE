@@ -1,0 +1,1 @@
+ gcc -m32 -o tp1 tp1.c
