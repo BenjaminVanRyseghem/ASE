@@ -2,26 +2,53 @@
 \input{/Users/benjamin/Documents/Education/LaTeX/macro.tex}
 
 \title{ASE: Séance 1}
-\author{Benjamin \bsc{Van Ryseghem}}
+\author{François \bsc{Lepan}\\Benjamin \bsc{Van Ryseghem}}
 
 \begin{document}
 \maketitle
 
 \section{Retour à un contexte}
 
-\verb?setjmp(ctx)? save the current context into the \verb?ctx? variable.
+\verb?#include <setjmp.h>?
+
+\verb?int setjmp(jmp_buf ctx)? save the current context into the \verb?ctx? variable.
 \begin{itemize}
 	\item[] first time, returns 0;
 	\item[] second time returns something different from 0.
 \end{itemize}
 
-\verb?longjmp(ctx, val)? where val is different from 0.
+\verb?void longjmp(jmp_buf ctx, int val)? where val is different from 0.
 Resume the cx context.
 
 \begin{attention}
 Beware of not keeping a context to a dead memory space (same principle that referring to a freed pointer)
 \end{attention}
 
-\signature
+
+\section{Exercice 2}
+Ce programme est erroné car le \verb?longjmp? change le contexte courant pour un contexte appartenant la partie de la pile qui a déjà été libérée.
+
+
+\section{Exercice 3}
+\begin{verbatimtab}
+jmp_buf buffer;
+static int mul(int depth) {	int i;	switch (scanf("%d", &i)) { 
+		case EOF :
+			return 1; /* neutral element */
+		case 0:
+			return mul(depth+1); /* erroneous read */
+		case 1 :			if (i)
+				return i * mul(depth+1);	
+			else
+				return longjmp(buffer, ~0);	}}
+				int main() {	int product;	printf("A list of int, please\n"); 
+	if (!setjmp(buffer)){
+		product = mul(0);
+	}
+	else { product = 0; } */
+	printf("product = %d\n", product);}
+\end{verbatimtab}
+
+\signature[François \bsc{Lepan}\\Benjamin \bsc{Van Ryseghem}]
 
 \end{document}
