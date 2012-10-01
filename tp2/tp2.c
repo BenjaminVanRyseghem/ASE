@@ -50,20 +50,19 @@ void switch_to_ctx(struct ctx_s *ctx){
 	
 	if(current_ctx == 0){
 		return_ctx = (struct ctx_s*)malloc(sizeof(struct ctx_s));
-		current_ctx = ctx;
 		printf("First context called\n");
 		__asm__ ("movl %%esp, %0\n" :"=r"(return_ctx->ctx_esp));
 		__asm__ ("movl %%ebp, %0\n" :"=r"(return_ctx->ctx_ebp));
-		__asm__ ("movl %0, %%esp\n" ::"r"(current_ctx->ctx_esp));
-		__asm__ ("movl %0, %%ebp\n" ::"r"(current_ctx->ctx_ebp));
 	}
 	else{
 		__asm__ ("movl %%esp, %0\n" :"=r"(current_ctx->ctx_esp));
-		__asm__ ("movl %%ebp, %0\n" :"=r"(current_ctx->ctx_ebp));
-		current_ctx = ctx;
+		__asm__ ("movl %%ebp, %0\n" :"=r"(current_ctx->ctx_ebp)); 
+	}
+	
+	current_ctx = ctx;
 		__asm__ ("movl %0, %%esp\n" ::"r"(current_ctx->ctx_esp));
 		__asm__ ("movl %0, %%ebp\n" ::"r"(current_ctx->ctx_ebp));
-	}
+		
 	if(current_ctx->ctx_state == CTX_RDY){
 		start_current_ctx();
 	}
