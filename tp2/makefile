@@ -10,4 +10,4 @@ clean:
 	rm -rf *.o *.dSYM
 
 realclean: clean
-	rm -rf tp1
+	rm -rf tp2

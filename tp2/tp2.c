@@ -50,7 +50,7 @@ void switch_to_ctx(struct ctx_s *ctx){
 	
 	if(current_ctx == 0){
 		return_ctx = (struct ctx_s*)malloc(sizeof(struct ctx_s));
-		printf("First context called\n");
+		printf("Save return context\n");
 		__asm__ ("movl %%esp, %0\n" :"=r"(return_ctx->ctx_esp));
 		__asm__ ("movl %%ebp, %0\n" :"=r"(return_ctx->ctx_ebp));
 	}
