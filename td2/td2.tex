@@ -1,0 +1,45 @@
+\documentclass[a4paper,10pt]{article}
+\input{/Users/benjamin/Documents/Education/LaTeX/macro.tex}
+
+\title{ASE: Sance 2}
+\author{Franois \bsc{Lepan}\\Benjamin \bsc{Van Ryseghem}}
+
+\begin{document}
+\maketitle
+
+\part*{Cration d'un contexte d'excution}
+\section{Exercice 5}
+\begin{verbatimtab}
+typedef void (func_t) (void*);
+typedef enum {CTX_RDY, CTX_EXQ, CTX_END} state_e;
+
+struct ctx_s {	
+	void* ctx_esp;
+	void* ctx_ebp;
+	unsigned ctx_magic;
+	func_t* ctx_f;
+	void* ctx_arg;
+	enum state_e ctx_state;
+	char* ctx_stack; /* adresse la plus basse de la pile */
+	unsigned ctx_size;
+};
+\end{verbatimtab}
+
+\section{Exercice 6}
+\begin{verbatimtab}
+int init_ctx(struct ctx_s *ctx, int stack_size, func_t f, void *args){
+	ctx->ctx_stack = (char*) malloc(stack_size);
+	if ( ctx->ctx_stack == NULL) return 1;
+	ctx->ctx_state = CTX_RDY;
+	ctx->ctx_size = stack_size;
+	ctx->ctx_f = f;
+	ctx->ctx_arg = args;
+	ctx->ctx_esp = &(ctx->ctx_stack[stack_size-sizeof(int)]);
+	ctx->ctx_ebp = ctx->ctx_esp;
+	return 0;
+}
+\end{verbatimtab}
+
+\signature[Franois \bsc{Lepan}\\Benjamin \bsc{Van Ryseghem}]
+
+\end{document}
