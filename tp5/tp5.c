@@ -30,7 +30,6 @@ void gotoSector(int cyl, int sect){
 	_out(HDA_DATAREGS+2, (sect>8) & 0xFF);
 	_out(HDA_DATAREGS+3, sect & 0xFF);
 	_out(HDA_CMDREG, CMD_SEEK);
-	printf("goto: before sleep\n");
 	_sleep(HDA_IRQ);
 }
 
@@ -65,25 +64,19 @@ void write_sector(unsigned int cyl, unsigned int sect, const unsigned char *buff
 		printf("Wrong sector index\n");
 		exit(EXIT_FAILURE);
 	}
-	printf("Goto\n");
 	gotoSector(cyl, sect);
-	printf("Initialization\n");
 	for (i = 0; i < HDA_SECTORSIZE ; i ++){
 		MASTERBUFFER[i] = buffer[i];
 	}
-	printf("Set args\n");
 	_out(HDA_DATAREGS, 0);
 	_out(HDA_DATAREGS+1, 1);
-	printf("Write\n");
 	_out(HDA_CMDREG, CMD_WRITE);
-	printf("before sleep\n");
 	_sleep(HDA_IRQ);
 }
 
 void format(){
 	int i;
 	for(i = 0 ; i < HDA_MAXCYLINDER; i ++){
-		printf("cylinder: %d\n",i);
 		format_sector(i, 0, HDA_MAXSECTOR, 0);
 	}
 	
@@ -97,7 +90,6 @@ unsigned int value){
 		buffer[i] = value;
 	}
 	for(i = sector ; i < sector+ nsector; i ++){
-		printf("sector: %d\n",i);
 		write_sector(cylinder,i,buffer);
 	}
 }
@@ -106,6 +98,7 @@ unsigned int value){
 int check_sector_size(){
 	int real_value;
 	_out(HDA_CMDREG, CMD_DSKINFO);
+	
 	real_value = ((int)MASTERBUFFER) & DISK_SECT_SIZE_MASK;
 	return real_value == HDA_SECTORSIZE;
 }
@@ -118,6 +111,7 @@ int main(){
     }
 	
 	if(!check_sector_size()){
+		fprintf(stderr, "Error in sectors size\n");
 		exit(EXIT_FAILURE);
 	}
 	
