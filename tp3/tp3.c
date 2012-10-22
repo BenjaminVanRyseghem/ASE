@@ -151,6 +151,7 @@ void f_pong(void *args) {
 	int i=0;
 	printf("1\n") ;
 	for(i=0; i < LOOP ; i++);
+	yield();
 	printf("2\n") ; 
 	for(i=0; i < LOOP ; i++);
 	printf("3\n") ; 

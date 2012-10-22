@@ -1,5 +1,5 @@
 CC=gcc
-CC_OPTIONS=-m32 
+CC_OPTIONS=-m32 -g
 #-Iinclude -Llib -lhardware
 
 all: tp3
