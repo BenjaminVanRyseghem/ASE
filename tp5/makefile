@@ -1,4 +1,4 @@
-CC=gcc
+CC=gcc-4.2
 CFLAGS= -Iinclude -g
 LDFLAGS= -Llib -lhardware
 all: tp5

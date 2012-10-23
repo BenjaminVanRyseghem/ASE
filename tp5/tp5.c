@@ -106,20 +106,43 @@ unsigned int value){
 int check_sector_size(){
 	int real_value;
 	_out(HDA_CMDREG, CMD_DSKINFO);
+	printf("MASTERBUFFER 1 : %d\n",(int)(MASTERBUFFER));
 	real_value = ((int)MASTERBUFFER) & DISK_SECT_SIZE_MASK;
+
+	printf("MASTERBUFFER 2 : %d\n",(int)(MASTERBUFFER));
+	printf("real_value : %d, HDA_SECTORSIZE : %d\n",real_value,HDA_SECTORSIZE);
+	
+	int temp = (int)MASTERBUFFER;
+	printf("MASTERBUFFER : \"");
+	while (temp != 0) {
+		printf ("%d",temp%2);
+			temp = temp / 2;
+	}
+	printf("\"\n");
+	
+	temp =DISK_SECT_SIZE_MASK;
+	printf("DISK_SECT_SIZE_MASK : \"");
+	while (temp != 0) {
+		printf ("%d",temp%2);
+			temp = temp / 2;
+	}
+	printf("\"\n");
+	printf("MASTERBUFFER 3 : %d\n",(int)(MASTERBUFFER));
 	return real_value == HDA_SECTORSIZE;
 }
 
 int main(){
+	printf("plop\n");
 	int i;
 	if(init_hardware("etc/hardware.ini") == 0) {
-		fprintf(stderr, "Error in hardware initialization\n");
+		fprintf(stdin, "Error in hardware initialization\n");
 		exit(EXIT_FAILURE);
     }
 	
-	if(!check_sector_size()){
-		exit(EXIT_FAILURE);
-	}
+	// if(!check_sector_size()){
+	// 		printf("plop2\n");
+	// 		exit(EXIT_FAILURE);
+	// 	}
 	
 	 /* Interreupt handlers */
     for(i=0; i<16; i++) IRQVECTOR[i] = empty_it;
