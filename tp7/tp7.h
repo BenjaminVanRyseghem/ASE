@@ -32,7 +32,17 @@ unsigned int value);
 int load_mbr();
 void save_mbr();
 void read_bloc(int vol, int n_bloc, unsigned char* buffer);
+void read_bloc_n(int vol, int n_bloc, unsigned char* buffer, int size);
 void write_bloc(unsigned int vol, unsigned int n_bloc, const unsigned char *buffer);
+void write_bloc_n(unsigned int vol, unsigned int n_bloc, const unsigned char *buffer, int size);
 void format_vol(unsigned int vol);
 
 void printf_vol(unsigned int i);
+
+void init_super(unsigned int vol);
+
+unsigned int new_bloc();
+void free_bloc(unsigned int bloc);
+
+void mkfs();
+void dfs();

@@ -1,16 +1,13 @@
 CC=gcc
 CFLAGS= -Iinclude -g
 LDFLAGS= -Llib -lhardware
-all: tp6
+all: vm
 
-vm: vm.o tp6.o dump.o
-	${CC} -o vm vm.o dump.o tp6.o ${LDFLAGS}
+vm: vm.o tp7.o dump.o
+	${CC} -o vm vm.o dump.o tp7.o ${LDFLAGS}
 
-tp6: tp6.o dump.o
-	${CC} -o tp6 dump.o tp6.o ${LDFLAGS}
-
-tp6.o: tp6.c
-	${CC} -o tp6.o -c tp6.c ${CFLAGS}
+tp7.o: tp7.c
+	${CC} -o tp7.o -c tp7.c ${CFLAGS}
 
 dump.o: dump.c
 	${CC} -o dump.o -c dump.c ${CFLAGS}
@@ -22,4 +19,4 @@ clean:
 	rm -rf *.o *.dSYM
 
 realclean: clean
-	rm -rf tp6
+	rm -rf vm
