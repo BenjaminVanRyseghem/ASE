@@ -42,6 +42,7 @@ struct superbloc_s{
 
 struct mbr_s mbr;
 struct superbloc_s current_super;
+unsigned current_volume;
 
 void init_super(unsigned int vol){
 	struct superbloc_s super;
@@ -57,22 +58,63 @@ void init_super(unsigned int vol){
 }
 
 void mkfs(){
-	unsigned vol = atoi(getenv("CURRENT_VOLUME"));
+	unsigned vol = current_volume;
 	init_super(vol);
 }
 
 int load_super(){
-	unsigned vol = atoi(getenv("CURRENT_VOLUME"));
+	unsigned vol = current_volume;
+	if(vol<0 || vol>= mbr.mbr_nvol){
+		fprintf(stderr,"Can't load because the current volume index is wrong\n");
+		return 1;
+	}
 	read_bloc_n(vol, SUPER_INDEX,(char*)&current_super, sizeof(struct superbloc_s));
 }
 
 int save_super(){
-	unsigned vol = atoi(getenv("CURRENT_VOLUME"));
+	unsigned vol = current_volume;
+	if(vol<0 || vol>= mbr.mbr_nvol){
+		return 1;
+	}
 	write_bloc_n(vol, SUPER_INDEX,(char*)&current_super, sizeof(struct superbloc_s));
 }
 
-unsigned int new_bloc(){
-	unsigned vol = atoi(getenv("CURRENT_VOLUME"));
+// void printVolume(){
+// 	printf("| S ");
+// 	
+// 	
+// }
+
+
+
+unsigned ask_for(char* phrase){
+	unsigned result;
+	printf("%s",phrase);
+
+	if(scanf("%i",&result) == 0) return -1;
+	return result;
+}
+
+void set_current_volume(unsigned vol){
+	if(vol<0 || vol >= mbr.mbr_nvol){
+		fprintf(stderr, "Wrong volume value\n\tentered value: %d\n\trange: 0 - %d\n",vol,mbr.mbr_nvol-1);
+		return ;
+	}
+	current_volume = vol;
+}
+
+void interactive_set_current_volume(){
+	unsigned vol = ask_for("Choose new volume index\n");
+	set_current_volume(vol);
+}
+
+unsigned int new_bloc_on(unsigned vol){
+	
+	if(vol<0 || vol >= mbr.mbr_nvol){
+		fprintf(stderr, "Wrong volume value\n\tentered value: %d\n\trange: 0 - %d\n",vol,mbr.mbr_nvol-1);
+		return 0;
+	}
+	
 	if(current_super.super_magic != SPR_MAGIC){ 
 		fprintf(stderr, "Load a super bloc first\n");
 		return 0;
@@ -93,8 +135,18 @@ unsigned int new_bloc(){
 	return n_bloc;
 }
 
+unsigned int interactive_new_bloc(){
+	unsigned vol = ask_for("Enter volume index:\n");
+	return new_bloc_on(vol);
+}
+
+unsigned int new_bloc(){
+	unsigned vol = current_volume;
+	return new_bloc_on(vol);
+}
+
 void free_bloc(unsigned int bloc){
-	unsigned vol = atoi(getenv("CURRENT_VOLUME"));
+	unsigned vol = current_volume;
 	if(current_super.super_magic != SPR_MAGIC){ 
 		fprintf(stderr, "Load a super bloc first\n");
 		return;
@@ -296,6 +348,7 @@ int load_mbr(){
 }
 
 void save_mbr(){
+	save_super();
 	write_sector(0, 0, ((unsigned char*)(&mbr)));
 }
 
@@ -375,15 +428,15 @@ void printf_vol(unsigned int i){
 }
 
 printf_current_vol(){
-	unsigned vol = atoi(getenv("CURRENT_VOLUME"));
+	unsigned vol = current_volume;
 	printf_vol(vol);
-	int rapport = current_super.super_occupation / mbr.mbr_vols[vol].vd_n_sector;
+	int rapport = 100*current_super.super_occupation / mbr.mbr_vols[vol].vd_n_sector;
 	printf("\ttaux d'occupation: %d %%\n", rapport);
 }
 
 void dfs(){
 	int i;
-	unsigned vol = atoi(getenv("CURRENT_VOLUME"));
+	unsigned vol = current_volume;
 	for ( i = 0 ; i < mbr.mbr_nvol; i++){
 		if ( i == vol) printf_current_vol();
 		else printf_vol(i);
@@ -412,13 +465,13 @@ void check_sector_size(){
 void check_sizes(){
 	int value;
 	value = sizeof(struct superbloc_s);
-	if(value<HDA_SECTORSIZE){
+	if(value>HDA_SECTORSIZE){
 		fprintf(stderr, "Error in sectors size\n\tminimal size needed: %d\n\tsize used: %d\n", HDA_SECTORSIZE, value);
 		exit(EXIT_FAILURE);
 	}
 	
 	value = sizeof(struct mbr_s);
-	if(value<HDA_SECTORSIZE){
+	if(value>HDA_SECTORSIZE){
 		fprintf(stderr, "Error in sectors size\n\tminimal size needed: %d\n\tsize used: %d\n", HDA_SECTORSIZE, value);
 		exit(EXIT_FAILURE);
 	}
@@ -427,6 +480,8 @@ void check_sizes(){
 
 void init(){
 	int i;
+	char* env_current_volume;
+	unsigned vol = -1;
 	if(init_hardware("etc/hardware.ini") == 0) {
 		fprintf(stderr, "Error in hardware initialization\n");
 		exit(EXIT_FAILURE);
@@ -440,4 +495,16 @@ void init(){
 	check_sizes();
 	
 	load_mbr();
+	
+	env_current_volume = getenv("CURRENT_VOLUME");
+	if(env_current_volume != NULL){
+		vol = atoi(env_current_volume);
+	}
+	current_volume = vol;
+	if(env_current_volume != NULL){
+		load_super();
+	}
+	else{
+		printf("First use the command \"edit\" to set a volume index\n");
+	}
 }

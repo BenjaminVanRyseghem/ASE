@@ -32,6 +32,9 @@ static void save(struct _cmd *c);
 static void quit(struct _cmd *c);
 static void xit(struct _cmd *c);
 static void none(struct _cmd *c) ;
+static void makefs(struct _cmd *c) ;
+static void newbloc(struct _cmd *c) ;
+static void edit_volume(struct _cmd *c) ;
 
 static struct _cmd commands [] = {
     {"list", list, 	"display the partition table"},
@@ -40,7 +43,10 @@ static struct _cmd commands [] = {
     {"save", save,	"save the MBR"},
     {"quit", quit,	"save the MBR and quit"},
     {"exit", xit,	"exit (without saving)"},
-    {"help", help,	"display this help"},
+	{"makefs", makefs,	"initialize the file system"},
+	{"newbloc", newbloc,	"allocate a free bloc"},
+	{"edit", edit_volume,	"edit a new volume"},
+	{"help", help,	"display this help"},
     {0, none, 		"unknown command, try help"}
 } ;
 
@@ -74,7 +80,8 @@ static void
 list(struct _cmd *c)
 {
     /*printf("%s NYI\n", c->name); */
-	listVolumes();
+	/*listVolumes();*/
+	dfs();
 }
 
 static void
@@ -84,9 +91,29 @@ new(struct _cmd *c)
 }
 
 static void
+newbloc(struct _cmd *c)
+{
+	new_bloc();
+}
+
+static void
+edit_volume(struct _cmd *c)
+{
+	save_super();
+	interactive_set_current_volume();
+	load_super();
+}
+
+static void
 del(struct _cmd *c)
 {
 	interactive_delete_volume();
+}
+
+static void
+makefs(struct _cmd *c)
+{
+	mkfs();
 }
 
 static void
