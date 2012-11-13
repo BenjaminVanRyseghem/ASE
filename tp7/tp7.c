@@ -3,13 +3,16 @@
 #include <string.h>
 #include <assert.h>
 
-#include "tp6.h"
+#include "tp7.h"
 #include "include/hardware.h"
 #include "dump.h"
 
 #define DISK_SECT_SIZE_MASK 0x0000FF
 #define MAX_VOL 8
 #define MBR_MAGIC 0xCAFE
+#define SPR_MAGIC 0xBABE
+#define SUPER_INDEX 0
+#define BLOC_NULL 0
 
 enum vd_type_e {VT_BASE, VT_ANX, VT_OTH};
 
@@ -26,7 +29,136 @@ struct mbr_s{
 	unsigned mbr_magic;
 };
 
+struct first_free_bloc_s{
+	unsigned int fb_nbloc;
+	unsigned int fb_next;
+};
+
+struct superbloc_s{
+	unsigned super_magic;
+	unsigned int super_first_free;
+	unsigned int super_occupation;
+};
+
 struct mbr_s mbr;
+struct superbloc_s current_super;
+unsigned current_volume;
+
+void init_super(unsigned int vol){
+	struct superbloc_s super;
+	super.super_first_free = 1;
+	super.super_occupation = 0;
+	super.super_magic = SPR_MAGIC;
+	struct first_free_bloc_s first;
+	first.fb_nbloc = mbr.mbr_vols[vol].vd_n_sector -1;
+	first.fb_next = BLOC_NULL;
+	
+	write_bloc_n(vol, SUPER_INDEX, (char*)&super, sizeof(struct superbloc_s));
+	write_bloc_n(vol, SUPER_INDEX+1, (char*)&first, sizeof(struct first_free_bloc_s));
+}
+
+void mkfs(){
+	unsigned vol = current_volume;
+	init_super(vol);
+}
+
+int load_super(){
+	unsigned vol = current_volume;
+	if(vol<0 || vol>= mbr.mbr_nvol){
+		fprintf(stderr,"Can't load because the current volume index is wrong\n");
+		return 1;
+	}
+	read_bloc_n(vol, SUPER_INDEX,(char*)&current_super, sizeof(struct superbloc_s));
+}
+
+int save_super(){
+	unsigned vol = current_volume;
+	if(vol<0 || vol>= mbr.mbr_nvol){
+		return 1;
+	}
+	write_bloc_n(vol, SUPER_INDEX,(char*)&current_super, sizeof(struct superbloc_s));
+}
+
+// void printVolume(){
+// 	printf("| S ");
+// 	
+// 	
+// }
+
+
+
+unsigned ask_for(char* phrase){
+	unsigned result;
+	printf("%s",phrase);
+
+	if(scanf("%i",&result) == 0) return -1;
+	return result;
+}
+
+void set_current_volume(unsigned vol){
+	if(vol<0 || vol >= mbr.mbr_nvol){
+		fprintf(stderr, "Wrong volume value\n\tentered value: %d\n\trange: 0 - %d\n",vol,mbr.mbr_nvol-1);
+		return ;
+	}
+	current_volume = vol;
+}
+
+void interactive_set_current_volume(){
+	unsigned vol = ask_for("Choose new volume index\n");
+	set_current_volume(vol);
+}
+
+unsigned int new_bloc_on(unsigned vol){
+	
+	if(vol<0 || vol >= mbr.mbr_nvol){
+		fprintf(stderr, "Wrong volume value\n\tentered value: %d\n\trange: 0 - %d\n",vol,mbr.mbr_nvol-1);
+		return 0;
+	}
+	
+	if(current_super.super_magic != SPR_MAGIC){ 
+		fprintf(stderr, "Load a super bloc first\n");
+		return 0;
+	}
+	struct first_free_bloc_s first;
+	unsigned int n_bloc = current_super.super_first_free;
+	if(n_bloc == BLOC_NULL) return BLOC_NULL; 
+	read_bloc_n(vol, n_bloc, (char*)&first, sizeof(struct first_free_bloc_s));
+	if(first.fb_nbloc == 1){
+		current_super.super_first_free = first.fb_next;
+	}
+	else {
+		current_super.super_first_free++;
+		first.fb_nbloc--;
+		write_bloc_n(vol, current_super.super_first_free, (char*)&first, sizeof(struct first_free_bloc_s));
+	}
+	current_super.super_occupation++;
+	return n_bloc;
+}
+
+unsigned int interactive_new_bloc(){
+	unsigned vol = ask_for("Enter volume index:\n");
+	return new_bloc_on(vol);
+}
+
+unsigned int new_bloc(){
+	unsigned vol = current_volume;
+	return new_bloc_on(vol);
+}
+
+void free_bloc(unsigned int bloc){
+	unsigned vol = current_volume;
+	if(current_super.super_magic != SPR_MAGIC){ 
+		fprintf(stderr, "Load a super bloc first\n");
+		return;
+	}
+	
+	struct first_free_bloc_s first;
+	first.fb_nbloc = 1;
+	first.fb_next = current_super.super_first_free;
+	current_super.super_first_free = bloc;
+	write_bloc_n(vol, bloc, (char*)&first, sizeof(struct first_free_bloc_s));
+	current_super.super_occupation--;	
+}
 
 int create_new_volume(unsigned f_s, unsigned f_c, unsigned n_s, enum vd_type_e type){
 	if(mbr.mbr_nvol == MAX_VOL){
@@ -104,7 +236,6 @@ void gotoSector(int cyl, int sect){
 		fprintf(stderr, "Wrong cylinder index\n");
 		exit(EXIT_FAILURE);
 	}
-	
 	if(sect<0 || sect > HDA_MAXSECTOR){
 		fprintf(stderr, "Wrong sector index\n");
 		exit(EXIT_FAILURE);
@@ -148,7 +279,7 @@ void read_sector(unsigned int cyl, unsigned int sect, unsigned char *buffer){
 	read_sector_n(cyl, sect, buffer, HDA_SECTORSIZE);
 }
 
-void write_sector(unsigned int cyl, unsigned int sect, const unsigned char *buffer){
+void write_sector_n(unsigned int cyl, unsigned int sect, const unsigned char *buffer, int size){
 	int i;
 	if(cyl<0 || cyl > HDA_MAXCYLINDER){
 		fprintf(stderr, "Wrong cylinder index\n");
@@ -159,9 +290,14 @@ void write_sector(unsigned int cyl, unsigned int sect, const unsigned char *buff
 		exit(EXIT_FAILURE);
 	}
 	
+	if(size<0 || size > HDA_SECTORSIZE){
+		fprintf(stderr, "Wrong size\n");
+		exit(EXIT_FAILURE);
+	}
+	
 	gotoSector(cyl, sect);
 	
-	for (i = 0; i < HDA_SECTORSIZE ; i ++){
+	for (i = 0; i < size ; i ++){
 		MASTERBUFFER[i] = buffer[i];
 	}
 	
@@ -169,6 +305,10 @@ void write_sector(unsigned int cyl, unsigned int sect, const unsigned char *buff
 	_out(HDA_DATAREGS+1, 1);
 	_out(HDA_CMDREG, CMD_WRITE);
 	_sleep(HDA_IRQ);
+}
+
+void write_sector(unsigned int cyl, unsigned int sect, const unsigned char *buffer){
+	write_sector_n(cyl, sect, buffer, HDA_SECTORSIZE);
 }
 
 void format(){
@@ -208,6 +348,7 @@ int load_mbr(){
 }
 
 void save_mbr(){
+	save_super();
 	write_sector(0, 0, ((unsigned char*)(&mbr)));
 }
 
@@ -245,6 +386,18 @@ void read_bloc(int vol, int n_bloc, unsigned char* buffer){
 	read_sector(cyl, sec, buffer);
 }
 
+void read_bloc_n(int vol, int n_bloc, unsigned char* buffer, int size){
+	unsigned int cyl = cylinder_of_bloc(vol, n_bloc);
+	unsigned int sec = sector_of_bloc(vol, n_bloc);
+	read_sector_n(cyl, sec, buffer, size);
+}
+
+void write_bloc_n(unsigned int vol, unsigned int n_bloc, const unsigned char *buffer, int size){
+	unsigned int cyl = cylinder_of_bloc(vol, n_bloc);
+	unsigned int sec = sector_of_bloc(vol, n_bloc);
+	write_sector_n(cyl, sec, buffer, size);
+}
+
 void write_bloc(unsigned int vol, unsigned int n_bloc, const unsigned char *buffer){
 	unsigned int cyl = cylinder_of_bloc(vol, n_bloc);
 	unsigned int sec = sector_of_bloc(vol, n_bloc);
@@ -274,6 +427,22 @@ void printf_vol(unsigned int i){
 		printf("\t(lc,ls); (%d,%d)\n\n",cylinder_of_bloc(i, mbr.mbr_vols[i].vd_n_sector), sector_of_bloc(i,mbr.mbr_vols[i].vd_n_sector-1));
 }
 
+printf_current_vol(){
+	unsigned vol = current_volume;
+	printf_vol(vol);
+	int rapport = 100*current_super.super_occupation / mbr.mbr_vols[vol].vd_n_sector;
+	printf("\ttaux d'occupation: %d %%\n", rapport);
+}
+
+void dfs(){
+	int i;
+	unsigned vol = current_volume;
+	for ( i = 0 ; i < mbr.mbr_nvol; i++){
+		if ( i == vol) printf_current_vol();
+		else printf_vol(i);
+	}
+}
+
 void listVolumes(){
 	int i;
 	for ( i = 0 ; i < mbr.mbr_nvol; i++){
@@ -288,13 +457,31 @@ void check_sector_size(){
 	_out(HDA_CMDREG, CMD_DSKINFO);
 	real_value = (_in(HDA_DATAREGS+4)<<8)|_in(HDA_DATAREGS+5);
 	if(real_value != HDA_SECTORSIZE){
-		fprintf(stderr, "Error in sectors size\n\tsize found: %d\n\tsize expected: %d\n", real_value,HDA_SECTORSIZE);
+		fprintf(stderr, "Error in sectors size\n\tsize expected: %d\n\tsize used: %d\n", HDA_SECTORSIZE, real_value);
 		exit(EXIT_FAILURE);
 	}
 }
 
+void check_sizes(){
+	int value;
+	value = sizeof(struct superbloc_s);
+	if(value>HDA_SECTORSIZE){
+		fprintf(stderr, "Error in sectors size\n\tminimal size needed: %d\n\tsize used: %d\n", HDA_SECTORSIZE, value);
+		exit(EXIT_FAILURE);
+	}
+	
+	value = sizeof(struct mbr_s);
+	if(value>HDA_SECTORSIZE){
+		fprintf(stderr, "Error in sectors size\n\tminimal size needed: %d\n\tsize used: %d\n", HDA_SECTORSIZE, value);
+		exit(EXIT_FAILURE);
+	}
+	
+}
+
 void init(){
 	int i;
+	char* env_current_volume;
+	unsigned vol = -1;
 	if(init_hardware("etc/hardware.ini") == 0) {
 		fprintf(stderr, "Error in hardware initialization\n");
 		exit(EXIT_FAILURE);
@@ -305,5 +492,19 @@ void init(){
 	for(i=0; i<16; i++) IRQVECTOR[i] = empty_it;
 	_mask(1);
 	
+	check_sizes();
+	
 	load_mbr();
+	
+	env_current_volume = getenv("CURRENT_VOLUME");
+	if(env_current_volume != NULL){
+		vol = atoi(env_current_volume);
+	}
+	current_volume = vol;
+	if(env_current_volume != NULL){
+		load_super();
+	}
+	else{
+		printf("First use the command \"edit\" to set a volume index\n");
+	}
 }
