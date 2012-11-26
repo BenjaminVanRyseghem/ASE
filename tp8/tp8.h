@@ -41,14 +41,17 @@ void printf_vol(unsigned int i);
 
 void init_super(unsigned int vol);
 
+unsigned current_volume;
+
 unsigned int new_bloc();
 void free_bloc(unsigned int bloc);
 
 void mkfs();
 void dfs();
 
-enum file_type_e {FT_STD, FT_DIR};
+enum file_type_e {FT_STD, FT_DIR, FT_SPEC};
 unsigned int create_inode(enum file_type_e type);
 int delete_inode(unsigned int inumber);
+int load_super();
+int save_super();
 
-unsigned int vbloc_of_fbloc(unsigned int inumber, unsigned int fbloc, int boolean);

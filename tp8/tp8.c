@@ -3,18 +3,12 @@
 #include <string.h>
 #include <assert.h>
 
-#include "tp8.h"
+
 #include "include/hardware.h"
 #include "dump.h"
+#include "inode.h"
 
-#define DISK_SECT_SIZE_MASK 0x0000FF
-#define MAX_VOL 8
-#define MBR_MAGIC 0xCAFE
-#define SPR_MAGIC 0xBABE
-#define SUPER_INDEX 0
-#define BLOC_NULL 0
-#define NDIRECT 10
-#define N_NBLOC_PER_BLOC (HDA_SECTORSIZE/sizeof(unsigned))
+
 
 enum vd_type_e {VT_BASE, VT_ANX, VT_OTH};
 struct vd_descr_s{
@@ -41,24 +35,15 @@ struct superbloc_s{
 	unsigned int super_occupation;
 };
 
-struct inode_s{
-	enum file_type_e in_type;
-	unsigned in_size;
-	unsigned in_direct[NDIRECT];
-	unsigned in_indirect;
-	unsigned in_db_indirect;
-};
-
 struct mbr_s mbr;
 struct superbloc_s current_super;
-unsigned current_volume;
 
 
 void read_inode(unsigned int inumber, struct inode_s *inode){
-	read_bloc_n(current_volume, inumber, (char*)inode, sizeof(struct inode_s));
+	read_bloc_n(current_volume, inumber, (unsigned char*)inode, sizeof(struct inode_s));
 }
-void write_inode(unsigned int inumber, struct inode_s *inode){
-	write_bloc_n(current_volume, inumber, (char*)inode, sizeof(struct inode_s));
+void write_inode(unsigned int inumber, const struct inode_s *inode){
+	write_bloc_n(current_volume, inumber, (unsigned char*)inode, sizeof(struct inode_s));
 }
 
 void initialize_inode(struct inode_s inode, enum file_type_e type){
@@ -73,14 +58,14 @@ void initialize_inode(struct inode_s inode, enum file_type_e type){
 }
 
 unsigned int create_inode(enum file_type_e type){
-	struct inode_s inode;
+	const struct inode_s inode;
 	unsigned inumber = new_bloc();
 	if(inumber==BLOC_NULL){
 		return BLOC_NULL;
 	}
 	
 	initialize_inode(inode, type);
-	write(inumber, inode);
+	write_inode(inumber, &inode);
 	return inumber;
 }
 
@@ -92,7 +77,7 @@ int delete_inode(unsigned int inumber){
 		if( inode.in_direct[i] != 0) free_bloc(inode.in_direct[i]);
 	}
 	int indirect[N_NBLOC_PER_BLOC];
-	read_bloc(current_volume, inode.in_indirect, (char*)indirect);
+	read_bloc(current_volume, inode.in_indirect, (unsigned char*)indirect);
 	for (i = 0; i < N_NBLOC_PER_BLOC; i++){
 		if (indirect[i] != 0){
 			free_bloc(indirect[i]);
@@ -101,11 +86,11 @@ int delete_inode(unsigned int inumber){
 	free_bloc(inode.in_indirect);
 	
 	int db_indirect[N_NBLOC_PER_BLOC];
-	read_bloc(current_volume, inode.in_db_indirect, (char*)db_indirect);
+	read_bloc(current_volume, inode.in_db_indirect, (unsigned char*)db_indirect);
 	for (i = 0; i < N_NBLOC_PER_BLOC; i++){
 		int j;
 		int tmp[N_NBLOC_PER_BLOC];
-		read_bloc(current_volume, db_indirect[i], (char*)tmp);
+		read_bloc(current_volume, db_indirect[i], (unsigned char*)tmp);
 		for (j = 0; j < N_NBLOC_PER_BLOC; j++){
 			if (tmp[i] != 0){
 				free_bloc(tmp[i]);
@@ -119,9 +104,10 @@ int delete_inode(unsigned int inumber){
 	return inumber;
 }
 
-unsigned int vbloc_of_fbloc(unsigned int inumber, unsigned int fbloc, int do_allocate){
+unsigned int vbloc_of_fbloc(unsigned int inumber, unsigned int fbloc, bool_t do_allocate){
 	struct inode_s inode;
 	read_inode(inumber, &inode);
+	printf("fbloc: %d | ", fbloc);
 	
 	if (fbloc > NDIRECT + N_NBLOC_PER_BLOC + N_NBLOC_PER_BLOC * N_NBLOC_PER_BLOC){
 		fprintf(stderr, "fbloc is greater than maximun size of a file\n\tfbloc: %d\n\tmaximum size: %ld",fbloc, NDIRECT+N_NBLOC_PER_BLOC*(N_NBLOC_PER_BLOC+1));
@@ -131,6 +117,7 @@ unsigned int vbloc_of_fbloc(unsigned int inumber, unsigned int fbloc, int do_all
 			inode.in_direct[fbloc] = new_bloc();
 			write_inode(inumber,&inode);
 		}
+		printf("direct vbloc: %d\n",inode.in_direct[fbloc]);
 		return inode.in_direct[fbloc];
 	}
 	
@@ -142,40 +129,43 @@ unsigned int vbloc_of_fbloc(unsigned int inumber, unsigned int fbloc, int do_all
 			return inode.in_indirect;
 		}
 		
-		read_bloc(current_volume, inode.in_indirect, (char*)indirect);
+		read_bloc(current_volume, inode.in_indirect, (unsigned char*)indirect);
 		
 		if (do_allocate && indirect[fbloc-NDIRECT] == 0) {
 			indirect[fbloc-NDIRECT] = new_bloc();
-			write_bloc(current_volume, inode.in_indirect, (char*)indirect);
+			write_bloc(current_volume, inode.in_indirect, (unsigned char*)indirect);
 		}
-		
+		printf("indirect vbloc: %d (%d)\n",indirect[fbloc-NDIRECT],fbloc-NDIRECT);
 		return indirect[fbloc-NDIRECT];
 	}
 	
 	if (do_allocate && inode.in_db_indirect == 0) {	
 			inode.in_db_indirect = new_bloc();
 			write_inode(inumber,&inode);
+			printf("vbloc: %d\n",inode.in_db_indirect);
 			return inode.in_db_indirect;
 	}
 	
 	int db_indirect[N_NBLOC_PER_BLOC];
-	read_bloc(current_volume, inode.in_db_indirect, (char*)db_indirect);
+	read_bloc(current_volume, inode.in_db_indirect, (unsigned char*)db_indirect);
 	
 	int db_index = (fbloc - NDIRECT - N_NBLOC_PER_BLOC) / N_NBLOC_PER_BLOC;
 	if (do_allocate && db_indirect[db_index] == 0) {	
 			db_indirect[db_index] = new_bloc();
-			write_bloc(current_volume, inode.in_db_indirect, (char*)db_indirect);
+			write_bloc(current_volume, inode.in_db_indirect, (unsigned char*)db_indirect);
+			printf("vbloc: %d\n",db_indirect[db_index]);
 			return db_indirect[db_index];
 	}
 
 	int tmp[N_NBLOC_PER_BLOC];
-	read_bloc(current_volume, db_indirect[db_index], (char*)tmp);
+	read_bloc(current_volume, db_indirect[db_index], (unsigned char*)tmp);
 	
 	if (do_allocate && tmp[(fbloc - NDIRECT - N_NBLOC_PER_BLOC) % N_NBLOC_PER_BLOC] == 0) {
 		tmp[(fbloc - NDIRECT - N_NBLOC_PER_BLOC) % N_NBLOC_PER_BLOC] = new_bloc();
-		write_bloc(current_volume, db_indirect[db_index], (char*)tmp);
+		write_bloc(current_volume, db_indirect[db_index], (unsigned char*)tmp);
 	}
 	
+	printf("double indirect vbloc: %d\n",tmp[(fbloc - NDIRECT - N_NBLOC_PER_BLOC) % N_NBLOC_PER_BLOC]);
 	return tmp[(fbloc - NDIRECT - N_NBLOC_PER_BLOC) % N_NBLOC_PER_BLOC];
 }
 
@@ -185,17 +175,18 @@ void init_super(unsigned int vol){
 	super.super_first_free = 1;
 	super.super_occupation = 0;
 	super.super_magic = SPR_MAGIC;
+	current_super=super;
 	struct first_free_bloc_s first;
 	first.fb_nbloc = mbr.mbr_vols[vol].vd_n_sector -1;
 	first.fb_next = BLOC_NULL;
-	
-	write_bloc_n(vol, SUPER_INDEX, (char*)&super, sizeof(struct superbloc_s));
-	write_bloc_n(vol, SUPER_INDEX+1, (char*)&first, sizeof(struct first_free_bloc_s));
+	write_bloc_n(vol, SUPER_INDEX, (unsigned char*)&super, sizeof(struct superbloc_s));
+	write_bloc_n(vol, SUPER_INDEX+1, (unsigned char*)&first, sizeof(struct first_free_bloc_s));
 }
 
 void mkfs(){
 	unsigned vol = current_volume;
 	init_super(vol);
+	load_super(vol);
 }
 
 int load_super(){
@@ -204,7 +195,8 @@ int load_super(){
 		fprintf(stderr,"Can't load because the current volume index is wrong\n");
 		return 1;
 	}
-	read_bloc_n(vol, SUPER_INDEX,(char*)&current_super, sizeof(struct superbloc_s));
+	read_bloc_n(vol, SUPER_INDEX,(unsigned char*)&current_super, sizeof(struct superbloc_s));
+	return 0;
 }
 
 int save_super(){
@@ -212,11 +204,12 @@ int save_super(){
 	if(vol<0 || vol>= mbr.mbr_nvol){
 		return 1;
 	}
-	write_bloc_n(vol, SUPER_INDEX,(char*)&current_super, sizeof(struct superbloc_s));
+	write_bloc_n(vol, SUPER_INDEX,(unsigned char*)&current_super, sizeof(struct superbloc_s));
+	return 0;
 }
 
 unsigned ask_for(char* phrase){
-	unsigned result;
+	unsigned int result;
 	printf("%s",phrase);
 
 	if(scanf("%i",&result) == 0) return -1;
@@ -250,14 +243,14 @@ unsigned int new_bloc_on(unsigned vol){
 	struct first_free_bloc_s first;
 	unsigned int n_bloc = current_super.super_first_free;
 	if(n_bloc == BLOC_NULL) return BLOC_NULL; 
-	read_bloc_n(vol, n_bloc, (char*)&first, sizeof(struct first_free_bloc_s));
+	read_bloc_n(vol, n_bloc, (unsigned char*)&first, sizeof(struct first_free_bloc_s));
 	if(first.fb_nbloc == 1){
 		current_super.super_first_free = first.fb_next;
 	}
 	else {
 		current_super.super_first_free++;
 		first.fb_nbloc--;
-		write_bloc_n(vol, current_super.super_first_free, (char*)&first, sizeof(struct first_free_bloc_s));
+		write_bloc_n(vol, current_super.super_first_free, (unsigned char*)&first, sizeof(struct first_free_bloc_s));
 	}
 	current_super.super_occupation++;
 	return n_bloc;
@@ -284,7 +277,7 @@ void free_bloc(unsigned int bloc){
 	first.fb_nbloc = 1;
 	first.fb_next = current_super.super_first_free;
 	current_super.super_first_free = bloc;
-	write_bloc_n(vol, bloc, (char*)&first, sizeof(struct first_free_bloc_s));
+	write_bloc_n(vol, bloc, (unsigned char*)&first, sizeof(struct first_free_bloc_s));
 	current_super.super_occupation--;	
 }
 
@@ -361,7 +354,7 @@ static void empty_it(){
 
 void gotoSector(int cyl, int sect){
 	if(cyl<0 || cyl > HDA_MAXCYLINDER){
-		fprintf(stderr, "Wrong cylinder index\n");
+		fprintf(stderr, "Wrong cylinder index\n\tindex provided: %d\n\trange: 0 - %d\n",cyl, HDA_MAXCYLINDER);
 		exit(EXIT_FAILURE);
 	}
 	if(sect<0 || sect > HDA_MAXSECTOR){
@@ -380,7 +373,7 @@ void gotoSector(int cyl, int sect){
 void read_sector_n(unsigned int cyl, unsigned int sect, unsigned char *buffer, int size){
 	int i;
 	if(cyl<0 || cyl > HDA_MAXCYLINDER){
-		fprintf(stderr, "Wrong cylinder index\n");
+		fprintf(stderr, "Wrong cylinder index\n\tindex provided: %d\n\trange: 0 - %d\n",cyl, HDA_MAXCYLINDER);
 		exit(EXIT_FAILURE);
 	}
 	if(sect<0 || sect > HDA_MAXSECTOR){
@@ -410,7 +403,7 @@ void read_sector(unsigned int cyl, unsigned int sect, unsigned char *buffer){
 void write_sector_n(unsigned int cyl, unsigned int sect, const unsigned char *buffer, int size){
 	int i;
 	if(cyl<0 || cyl > HDA_MAXCYLINDER){
-		fprintf(stderr, "Wrong cylinder index\n");
+		fprintf(stderr, "Wrong cylinder index\n\tindex provided: %d\n\trange: 0 - %d\n",cyl, HDA_MAXCYLINDER);
 		exit(EXIT_FAILURE);
 	}
 	if(sect<0 || sect > HDA_MAXSECTOR){
@@ -545,6 +538,7 @@ char* printType(enum vd_type_e type){
 		case VT_ANX:	return "VT_ANX";
 		case VT_OTH:	return "VT_OTH";
 	}
+	return "ERROR";
 }
 
 void printf_vol(unsigned int i){
@@ -555,7 +549,7 @@ void printf_vol(unsigned int i){
 		printf("\t(lc,ls); (%d,%d)\n\n",cylinder_of_bloc(i, mbr.mbr_vols[i].vd_n_sector), sector_of_bloc(i,mbr.mbr_vols[i].vd_n_sector-1));
 }
 
-printf_current_vol(){
+void printf_current_vol(){
 	unsigned vol = current_volume;
 	printf_vol(vol);
 	int rapport = 100*current_super.super_occupation / mbr.mbr_vols[vol].vd_n_sector;
