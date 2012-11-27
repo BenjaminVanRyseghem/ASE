@@ -572,7 +572,6 @@ void listVolumes(){
 	}
 }
 
-
 /* exit if the size is wrong */
 void check_sector_size(){
 	int real_value;
