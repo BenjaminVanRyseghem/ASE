@@ -8,7 +8,7 @@
 #include "dump.h"
 #include "inode.h"
 
-
+unsigned ask_for(char* s);
 
 enum vd_type_e {VT_BASE, VT_ANX, VT_OTH};
 struct vd_descr_s{
@@ -183,19 +183,39 @@ void init_super(unsigned int vol){
 	write_bloc_n(vol, SUPER_INDEX+1, (unsigned char*)&first, sizeof(struct first_free_bloc_s));
 }
 
+void private_mkfs(unsigned vol){
+	if(vol < 0 || vol >= mbr.mbr_nvol) {
+		printf("Can't create a new file system because the current volume index is wrong\n");
+		printf("or there is no partition on the disk.\n"); 
+		printf("Have you used edit to choose the partition ? or new to create a new partition ?\n");
+		return;
+	}
+	init_super(vol);
+}
+
 void mkfs(){
 	unsigned vol = current_volume;
-	init_super(vol);
-	load_super(vol);
+	private_mkfs(vol);
+}
+
+void interactive_mkfs(){
+	unsigned vol = ask_for("Choose volume where to set a file system\n");
+	private_mkfs(vol);
 }
 
 int load_super(){
+	struct superbloc_s old = current_super;
 	unsigned vol = current_volume;
 	if(vol<0 || vol>= mbr.mbr_nvol){
-		fprintf(stderr,"Can't load because the current volume index is wrong\n");
+		fprintf(stderr,"Can't load because the current volume index is wrong. have u used edit ?\n");
 		return 1;
 	}
-	read_bloc_n(vol, SUPER_INDEX,(unsigned char*)&current_super, sizeof(struct superbloc_s));
+	read_bloc_n(vol, SUPER_INDEX,(char*)&current_super, sizeof(struct superbloc_s));
+	if (current_super.super_magic != SPR_MAGIC) {
+		fprintf(stderr,"Try to load a bloc that is not super\nMaybe you should create a file system (makefs)\n");
+		current_super = old;
+		return 1;
+	}
 	return 0;
 }
 
@@ -204,7 +224,13 @@ int save_super(){
 	if(vol<0 || vol>= mbr.mbr_nvol){
 		return 1;
 	}
-	write_bloc_n(vol, SUPER_INDEX,(unsigned char*)&current_super, sizeof(struct superbloc_s));
+	
+	if (current_super.super_magic != SPR_MAGIC) {
+		fprintf(stderr,"Try to save the bloc that is not SUUUUPPPPPPERRR\n");
+		return 1;
+	}
+	
+	write_bloc_n(vol, SUPER_INDEX,(char*)&current_super, sizeof(struct superbloc_s));
 	return 0;
 }
 
@@ -261,12 +287,12 @@ unsigned int interactive_new_bloc(){
 	return new_bloc_on(vol);
 }
 
-unsigned int new_bloc(){
+unsigned int new_bloc() {
 	unsigned vol = current_volume;
 	return new_bloc_on(vol);
 }
 
-void free_bloc(unsigned int bloc){
+void free_bloc(unsigned int bloc) {
 	unsigned vol = current_volume;
 	if(current_super.super_magic != SPR_MAGIC){ 
 		fprintf(stderr, "Load a super bloc first\n");
