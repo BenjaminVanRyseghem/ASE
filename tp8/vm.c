@@ -113,7 +113,7 @@ del(struct _cmd *c)
 static void
 makefs(struct _cmd *c)
 {
-	mkfs();
+	interactive_mkfs();
 }
 
 static void

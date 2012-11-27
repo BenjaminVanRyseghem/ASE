@@ -207,7 +207,7 @@ int load_super(){
 	struct superbloc_s old = current_super;
 	unsigned vol = current_volume;
 	if(vol<0 || vol>= mbr.mbr_nvol){
-		fprintf(stderr,"Can't load because the current volume index is wrong. have u used edit ?\n");
+		fprintf(stderr,"Can't load because the current volume index is wrong.\n");
 		return 1;
 	}
 	read_bloc_n(vol, SUPER_INDEX,(char*)&current_super, sizeof(struct superbloc_s));
