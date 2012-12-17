@@ -1,19 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "include/hardware.h"
-#include ""
+#include "swap.h"
 
-#define PAGE_SIZE 4
 
-#define PM_PAGES 256 // 1<<8
-#define PM_SIZE PAGE_SIZE*PM_PAGES
-#define BEGIN_PMEM *(int*)&physical_memory
-#define END_PMEM  *(int*)&physical_memory + PM_SIZE - 1
-
-#define VM_PAGES 4096 // 1<<12
-#define VM_SIZE PAGE_SIZE*VM_PAGES
-#define BEGIN_VMEM *(int*)&virtual_memory
-#define END_VMEM  *(int*)&virtual_memory + VM_SIZE - 1
 
 struct tlb_entry_s {
 	unsigned tlb_dummy : 8; // un chanmp de 8 bit
@@ -109,11 +100,11 @@ mmuhandler() {
 		pm_mapping[next_ppage].pm_vpage = vpage;
 		pm_mapping[next_ppage].pm_mapped = 1;
 		
-		 struct tlb_entry_s tlb;
-		 		tlb.tlb_vpage = vpage;	
-		 		tlb.tlb_ppage = next_ppage;
-		 		tlb.tlb_xwr = 7;
-		 		tlb.tlb_valid = 1;
+		struct tlb_entry_s tlb;
+	 	tlb.tlb_vpage = vpage;	
+ 		tlb.tlb_ppage = next_ppage;
+ 		tlb.tlb_xwr = 7;
+ 		tlb.tlb_valid = 1;
 		
 		_out(TLB_ADD_ENTRY, *(int*)&tlb);
 		
@@ -144,21 +135,17 @@ static int ppage_of_vaddr(int process, unsigned vaddr) {
 
 
 
-
-
-
-
 int main(int argc, char **argv) {
 	char *ptr;
 	//... /* init_hardware() */
 	
 	// on ajoute la fonction mmuhandler au MMU_IRQ;
-	IRQVECTOR[MMU_IRQ] = mmuhandler; 
+	//IRQVECTOR[MMU_IRQ] = mmuhandler; 
 	
 	// les signaux d'interuption ne se font qu'au niveau 1;
 	_mask(1);
 	
 	// ecrire c a l'adresse 0
     ptr = (char*)0;
-	*ptr = 'c';
+	//*ptr = 'c';
 }
