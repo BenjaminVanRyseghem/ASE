@@ -2,5 +2,7 @@
 
 export HW_CONFIG=etc/hardware.ini
 export CURRENT_VOLUME=0
-
-#make & make -f Makefile2
+echo "exports done"
+echo ""
+echo "To compile run:
+	make & make -f Makefile2"
