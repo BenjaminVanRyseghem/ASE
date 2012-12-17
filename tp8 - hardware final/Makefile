@@ -10,17 +10,17 @@ CFLAGS  += -g
 LIBDIR  =  $(ROOTDIR)/lib
 INCDIR  =  $(ROOTDIR)/include
 CFLAGS  += -I$(INCDIR)
+LDFLAGS	= -Llib -lhardware
 LIBS    = -lhardware
 
 ###------------------------------
 ### Main targets 
 ###------------------------------------------------------------
-BINARIES= if_pfile if_nfile if_cfile if_dfile
+BINARIES= vm if_pfile if_nfile if_cfile if_dfile
 OBJECTS	= $(addsuffix .o,\
 	  tools ifile mount tp8)
 
 all: $(BINARIES) $(OBJECTS)
-
 
 ###------------------------------
 ### Binaries
@@ -29,6 +29,18 @@ if_cfile : if_cfile.o $(OBJECTS)
 if_nfile : if_nfile.o $(OBJECTS)
 if_dfile : if_dfile.o $(OBJECTS)
 if_pfile : if_pfile.o $(OBJECTS)
+
+vm: vm.o tp8.o dump.o
+	${CC} -o vm vm.o dump.o tp8.o ${LDFLAGS}
+
+tp8.o: tp8.c
+	${CC} -o tp8.o -c tp8.c ${CFLAGS}
+
+dump.o: dump.c
+	${CC} -o dump.o -c dump.c ${CFLAGS}
+
+vm.o: vm.c
+	${CC} -o vm.o -c vm.c ${CFLAGS}
 
 % : %.o
 	$(CC) -o $@ $^ -L$(LIBDIR) $(LIBS)

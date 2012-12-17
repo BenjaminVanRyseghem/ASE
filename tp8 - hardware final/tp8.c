@@ -104,69 +104,138 @@ int delete_inode(unsigned int inumber){
 	return inumber;
 }
 
+unsigned initialize_bloc(unsigned adress){
+	int new_bloc[N_NBLOC_PER_BLOC];	
+	int i;
+	
+	read_bloc(current_volume, adress, (unsigned char*)new_bloc);
+	for (i = 0; i < N_NBLOC_PER_BLOC; i++){
+		new_bloc[i] = 0;
+	}
+	write_bloc(current_volume, adress, (unsigned char*)new_bloc);
+	return adress;
+}
+
 unsigned int vbloc_of_fbloc(unsigned int inumber, unsigned int fbloc, bool_t do_allocate){
 	struct inode_s inode;
+	unsigned int block_index = fbloc;
 	read_inode(inumber, &inode);
-	printf("fbloc: %d | ", fbloc);
-	
-	if (fbloc > NDIRECT + N_NBLOC_PER_BLOC + N_NBLOC_PER_BLOC * N_NBLOC_PER_BLOC){
-		fprintf(stderr, "fbloc is greater than maximun size of a file\n\tfbloc: %d\n\tmaximum size: %ld",fbloc, NDIRECT+N_NBLOC_PER_BLOC*(N_NBLOC_PER_BLOC+1));
-	}
-	if ( fbloc < NDIRECT ){
-		if (do_allocate && inode.in_direct[fbloc] == 0) {
-			inode.in_direct[fbloc] = new_bloc();
-			write_inode(inumber,&inode);
+	//printf("fbloc: %d | ", block_index);
+
+	//printf("do_allocate: %d | ", do_allocate);
+	//direct
+	if (block_index < NDIRECT){
+		if (inode.in_direct[block_index] == 0)
+		{
+			if(do_allocate){
+				//printf("allocate inode.in_direct[block_index]\n");
+				inode.in_direct[block_index] = initialize_bloc(new_bloc());
+				write_inode(inumber,&inode);
+				
+			}
+			else{
+				//printf( "access an unallocated bloc\n");
+			 	return BLOC_NULL;
+			}
 		}
-		printf("direct vbloc: %d\n",inode.in_direct[fbloc]);
-		return inode.in_direct[fbloc];
+		//printf("direct vbloc: %d\n",inode.in_direct[block_index]);
+		return inode.in_direct[block_index];
 	}
 	
-	if ( fbloc < NDIRECT + N_NBLOC_PER_BLOC ){
-		int indirect[N_NBLOC_PER_BLOC];
-		if (do_allocate && inode.in_indirect == 0) {	
-			inode.in_indirect = new_bloc();
-			write_inode(inumber,&inode);
-			return inode.in_indirect;
+	block_index -= NDIRECT;
+
+	//indirect simple
+	if (block_index < N_NBLOC_PER_BLOC){
+		// if the indirect entry in the inode is not allocated yet
+		if (inode.in_indirect == 0)
+		{
+			if(do_allocate){
+				//printf("allocate inode.in_indirect\n");
+				inode.in_indirect = initialize_bloc(new_bloc());;
+				write_inode(inumber,&inode);
+			}
+			else { 
+				//printf( "access an unallocated bloc\n");
+			 	return BLOC_NULL; }
 		}
 		
+		int indirect[N_NBLOC_PER_BLOC];	
 		read_bloc(current_volume, inode.in_indirect, (unsigned char*)indirect);
 		
-		if (do_allocate && indirect[fbloc-NDIRECT] == 0) {
-			indirect[fbloc-NDIRECT] = new_bloc();
-			write_bloc(current_volume, inode.in_indirect, (unsigned char*)indirect);
+		if (indirect[block_index] == 0)
+		{
+			if(do_allocate){
+				//printf("allocate indirect[block_index]\n");
+				indirect[block_index] = initialize_bloc(new_bloc());;
+				write_bloc(current_volume, inode.in_indirect, (unsigned char*)indirect);
+			}
+			else { 
+				//printf( "access an unallocated bloc\n");
+				return BLOC_NULL; }
 		}
-		printf("indirect vbloc: %d (%d)\n",indirect[fbloc-NDIRECT],fbloc-NDIRECT);
-		return indirect[fbloc-NDIRECT];
+		
+		//printf("indirect vbloc: %d\n",indirect[block_index]);
+		return indirect[block_index];
 	}
 	
-	if (do_allocate && inode.in_db_indirect == 0) {	
-			inode.in_db_indirect = new_bloc();
-			write_inode(inumber,&inode);
-			printf("vbloc: %d\n",inode.in_db_indirect);
-			return inode.in_db_indirect;
+	block_index -= N_NBLOC_PER_BLOC;
+	
+	//indirect double
+	if(block_index < N_NBLOC_PER_BLOC*N_NBLOC_PER_BLOC){
+		if (inode.in_db_indirect == 0)
+		{
+			if(do_allocate){
+				//printf("allocate inode.in_db_indirect\n");
+				inode.in_db_indirect = initialize_bloc(new_bloc());;
+				write_inode(inumber,&inode);
+			}
+			else {
+				//printf( "access an unallocated bloc\n");
+			 	return BLOC_NULL; }
+		}
+		
+		int db_indirect_index = block_index / N_NBLOC_PER_BLOC;
+		int indirect_index = block_index % N_NBLOC_PER_BLOC; 
+		//printf("block_index = %d, db_indirect_index = %d, indirect_index=%d\n",block_index,db_indirect_index,indirect_index);
+		
+		
+		int db_indirect[N_NBLOC_PER_BLOC];
+		read_bloc(current_volume, inode.in_db_indirect, (unsigned char*)db_indirect);
+		
+		if (db_indirect[db_indirect_index] == 0)
+		{
+			if(do_allocate){
+				//printf("allocate db_indirect[%d]\n",db_indirect_index);
+				db_indirect[db_indirect_index] = initialize_bloc(new_bloc());;
+				write_bloc(current_volume, inode.in_db_indirect, (unsigned char*)db_indirect);
+			}
+			else { 
+				//printf( "access an unallocated bloc\n");
+			 	return BLOC_NULL; }
+		}
+		
+		int indirect[N_NBLOC_PER_BLOC];	
+		read_bloc(current_volume, db_indirect[db_indirect_index], (unsigned char*)indirect);
+		
+		if (indirect[indirect_index] == 0)
+		{
+			if(do_allocate){
+				//printf("allocate indirect[%d]\n",indirect_index);
+				indirect[indirect_index] = initialize_bloc(new_bloc());;
+				write_bloc(current_volume, db_indirect[db_indirect_index], (unsigned char*)indirect);
+			}
+			else { 
+				//printf( "access an unallocated bloc\n");
+			 	return BLOC_NULL; }
+		}
+		
+		//printf("double indirect vbloc: %d\n",indirect[indirect_index]);
+		return indirect[indirect_index]; 
+		
 	}
 	
-	int db_indirect[N_NBLOC_PER_BLOC];
-	read_bloc(current_volume, inode.in_db_indirect, (unsigned char*)db_indirect);
-	
-	int db_index = (fbloc - NDIRECT - N_NBLOC_PER_BLOC) / N_NBLOC_PER_BLOC;
-	if (do_allocate && db_indirect[db_index] == 0) {	
-			db_indirect[db_index] = new_bloc();
-			write_bloc(current_volume, inode.in_db_indirect, (unsigned char*)db_indirect);
-			printf("vbloc: %d\n",db_indirect[db_index]);
-			return db_indirect[db_index];
-	}
-
-	int tmp[N_NBLOC_PER_BLOC];
-	read_bloc(current_volume, db_indirect[db_index], (unsigned char*)tmp);
-	
-	if (do_allocate && tmp[(fbloc - NDIRECT - N_NBLOC_PER_BLOC) % N_NBLOC_PER_BLOC] == 0) {
-		tmp[(fbloc - NDIRECT - N_NBLOC_PER_BLOC) % N_NBLOC_PER_BLOC] = new_bloc();
-		write_bloc(current_volume, db_indirect[db_index], (unsigned char*)tmp);
-	}
-	
-	printf("double indirect vbloc: %d\n",tmp[(fbloc - NDIRECT - N_NBLOC_PER_BLOC) % N_NBLOC_PER_BLOC]);
-	return tmp[(fbloc - NDIRECT - N_NBLOC_PER_BLOC) % N_NBLOC_PER_BLOC];
+	fprintf(stderr,"fbloc is too big.\n\tfbloc provided: %d\n\tfbloc max size: %d",fbloc, NDIRECT+N_NBLOC_PER_BLOC+N_NBLOC_PER_BLOC*N_NBLOC_PER_BLOC);
+	return -1;
 }
 
 
