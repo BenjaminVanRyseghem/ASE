@@ -39,32 +39,33 @@ struct mbr_s mbr;
 struct superbloc_s current_super;
 
 
-void read_inode(unsigned int inumber, struct inode_s *inode){
+void read_inode(unsigned int inumber,  struct inode_s *inode){
 	read_bloc_n(current_volume, inumber, (unsigned char*)inode, sizeof(struct inode_s));
 }
 void write_inode(unsigned int inumber, const struct inode_s *inode){
 	write_bloc_n(current_volume, inumber, (unsigned char*)inode, sizeof(struct inode_s));
 }
 
-void initialize_inode(struct inode_s inode, enum file_type_e type){
+void initialize_inode(struct inode_s* inode, enum file_type_e type){
 	int i;
-	inode.in_type = type;
-	inode.in_size = 0;
+	inode->in_type = type;
+	inode->in_size = 0;
 	for (i = 0 ; i < NDIRECT ; i++){
-		inode.in_direct[i] = 0;		
+		inode->in_direct[i] = 0;		
 	}
-	inode.in_indirect = BLOC_NULL;
-	inode.in_db_indirect = BLOC_NULL;
+
+	inode->in_indirect = BLOC_NULL;
+	inode->in_db_indirect = BLOC_NULL;
 }
 
 unsigned int create_inode(enum file_type_e type){
-	const struct inode_s inode;
+	struct inode_s inode;
 	unsigned inumber = new_bloc();
 	if(inumber==BLOC_NULL){
 		return BLOC_NULL;
 	}
 	
-	initialize_inode(inode, type);
+	initialize_inode(&inode, type);
 	write_inode(inumber, &inode);
 	return inumber;
 }
