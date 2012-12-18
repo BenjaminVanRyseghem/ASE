@@ -18,21 +18,19 @@ void switch_to_process1(void) {
 
 int main() {
 	_out(MMU_PROCESS,1);
-	
-	printf("main avant init hardware\n");
+	if(init_swap("swap")) {
+		fprintf(stderr, "Error in swap initialization\n");
+		exit(EXIT_FAILURE);
+	}
 	if(init_hardware("etc/hardware.ini") == 0) {
 		fprintf(stderr, "Error in hardware initialization\n");
 		exit(EXIT_FAILURE);
 	}
 	IRQVECTOR[MMU_IRQ] = mmuhandler;
-	printf("main apres init hardware\n");
 	IRQVECTOR[SYSCALL_SWTCH_0] = switch_to_process0; 
-	printf("plip\n");
 	IRQVECTOR[SYSCALL_SWTCH_1] = switch_to_process1; 
 	
 
-	printf("before mask\n");
 	_mask(0x1001);
-	printf("main avant init\n");
 	init();
 }
