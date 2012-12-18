@@ -4,8 +4,6 @@
 #include "include/hardware.h"
 #include "swap.h"
 
-
-
 struct tlb_entry_s {
 	unsigned tlb_dummy : 8; // un chanmp de 8 bit
 	unsigned tlb_vpage : 12;
@@ -19,72 +17,39 @@ struct pm_mapp_s {
 	unsigned pm_mapped : 1;
 };
 
-static struct pm_mapp_s pm_mapping[PM_PAGES];
-
 struct vm_mapp_s {
 	unsigned vm_ppage : 8;
 	unsigned vm_mapped : 1;
 };
 
+static struct pm_mapp_s pm_mapping[PM_PAGES];
 static struct vm_mapp_s vm_mapping[VM_PAGES];
 
 static unsigned next_ppage = 1;
-
 struct tlb_entry_s global_tlb;
-int current_process;
-static unsigned ppage_mapping;
 
 
-mmuhandler() {
-	printf("tentative d’acces illegal a l’adresse %d\n", _in(MMU_FAULT_ADDR));
-	
-	//////////////////////////
-	// struct tlb_entry_s tlb;
-	// tlb.tlb_vpage = vpage;
-	// tlb.tlb_ppage = ppage_of_addr(current_ctx, vaddr);
-	// 
-	// if (tlb.ppage == -1) {
-	// 	fprintf(stderr,"segmentation fault");
-	// 	return;
-	// }
-	// 
-	// tlb.tlb_xwr = 7;
-	// tlb.tlb_valid = 1;
-	// 
-// _out(TLB_ADD_ENTRY, tlb);
-	/////////////////////////////////
-	
-	/////////////////////////////////////
-	// store_to_swap(vp, pp);
-	// 	fetch_from_swap(vp, pp);
-	// 	vaddr = _in(MMU_FAULT_ADDR);
-	// 	vpage = (vaddr >> 12) & 0xFF;
-	// 	if virtual_memory <= vaddr <= virtual_mmeory+VM_SIZE+1
-	// 	store_to_swap(ppage_mapping, 1);
-	// 	fetch_from_swap(vp, 1);
-	// 	
-	// 	struct tlb_entry_s tlb_suppr;
-	// 	tlb_suppr.ppage = 1;
-	// 	
-	// 	_out(TLB_DEL_ENTRY, tlb_suppr/* <- tlb_page*/);
-	// 	
-	// 	struct tlb_entry_s tlb_add;
-	// 	tlb_add.tbl_vpage = vpage;
-	// 	tlb_add.acces = 7;
-	// 	tlb_add.valid = 1;
-	// 	
-	// 	_out(TLB_ADD_ENTRY, tlb_add);
-	// 	
-	// 	ppage_mapping = vpage;
-	//////////////////////////////////////
-	
+void mmuhandler() {
 	// on recupere : vaddr, vpage
 	unsigned vaddr, vpage, ppage;
+	
+	printf("mmu handler !!\n");
+	
+	vaddr = _in(MMU_FAULT_ADDR);
+	
+	printf("tentative d’acces illegal a l’adresse %d\n", vaddr);
+	
+	ppage = ppage_of_vaddr(current_process,vaddr);
+	
+	if (ppage == -1) {
+		printf("sa fait de la merde !!!");
+	}
+	
+	vpage = (vaddr >> 12) & 0xFF;
+	
 	// address pas dans tlb mais mapper
-	
-	
 	if (vm_mapping[vpage].vm_mapped) { 
-		_out(TLB_ADD_ENTRY, (vpage, vm_mapping[vpage].vm_ppage));
+		_out(TLB_ADD_ENTRY, /*(*/vpage/*, vm_mapping[vpage].vm_ppage)*/);
 	} else {
 		// assurer le mapping de vm avec pm
 		if(pm_mapping[ppage].pm_mapped) {
@@ -112,40 +77,30 @@ mmuhandler() {
 	}
 }
 
-
-
-// Q 3.2
-static int ppage_of_vaddr(int process, unsigned vaddr) {
+int ppage_of_vaddr(int process, unsigned vaddr) {
+	
+	printf("ppage_of_vaddr !!\n");
+	
 	// vaddr -> valide ?
-	if (vaddr > END_VMEM || vaddr < BEGIN_VMEM)
-		return -1;
+	if (vaddr > END_VMEM || vaddr < BEGIN_VMEM)	return -1;
 		
 	// calculer le vpage -> 12 bits de poids fort
 	int vpage  = (vaddr >> 12) & 0xFF;
 	
 	// vpage -> valide ?
-	if (vpage > PM_PAGES/*N/2 ??*/ || vpage < 0) return -1;
+	if (vpage > N/2 || vpage < 0) return -1;
 	
-	//process
-	if (current_process) global_tlb.tlb_ppage = global_tlb.tlb_vpage+1;
-	else				 global_tlb.tlb_ppage = global_tlb.tlb_vpage/*+N/2*/+1;	 
-		
-	return 0;
+	struct tlb_entry_s* tlb_entries;
+	unsigned entries = _in(TLB_ENTRIES);
+	tlb_entries = (struct tlb_entry_s*)(&entries);
+	
+	int i;
+	for (i=0; i<TLB_SIZE; i++) {
+		if (tlb_entries[i].tlb_vpage == vpage) {
+			return tlb_entries[i].tlb_ppage;
+		}
+	}
+	
+	return -1;
 }
 
-
-
-int main(int argc, char **argv) {
-	char *ptr;
-	//... /* init_hardware() */
-	
-	// on ajoute la fonction mmuhandler au MMU_IRQ;
-	//IRQVECTOR[MMU_IRQ] = mmuhandler; 
-	
-	// les signaux d'interuption ne se font qu'au niveau 1;
-	_mask(1);
-	
-	// ecrire c a l'adresse 0
-    ptr = (char*)0;
-	//*ptr = 'c';
-}

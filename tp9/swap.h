@@ -10,6 +10,12 @@
 #define BEGIN_VMEM *(int*)&virtual_memory
 #define END_VMEM  *(int*)&virtual_memory + VM_SIZE - 1
 
+#define TLB_SIZE 32
+#define TLB_ENTRIES 0x800	
+
+#define N 20
+
+static int current_process;
 
 char init_swap(const char *path);
 char store_to_swap(int vpage, int ppage);

@@ -1,11 +1,18 @@
 CC=gcc
 CFLAGS= -Iinclude -g
 LDFLAGS= -Llib -lhardware
-all: mmuhandler
+all: mi_kernel
 
-mmuhandler: mmuhandler.o swap.o
-	${CC} -o mmuhandler mmuhandler.o swap.o ${LDFLAGS}
+
+mi_kernel: mi_user.o mi_kernel.o mmuhandler.o swap.o
+	${CC} -o mi_kernel mi_kernel.o mi_user.o mmuhandler.o swap.o ${LDFLAGS}
 	
+mi_kernel.o: mi_kernel.c
+	${CC} -o mi_kernel.o -c mi_kernel.c ${CFLAGS}
+
+mi_user.o: mi_user.c
+	${CC} -o mi_user.o -c mi_user.c ${CFLAGS}
+
 mmuhandler.o: mmuhandler.c
 	${CC} -o mmuhandler.o -c mmuhandler.c ${CFLAGS}
 

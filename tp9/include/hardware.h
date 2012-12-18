@@ -11,14 +11,6 @@
 #ifndef _HARDWARE_H_
 #define _HARDWARE_H_
 
-
-#define MMU_ENABLE 		1		// MMU_ENABLE = 0 => simulation de la MMU désactivée
-#define MMU_IRQ			13		// Niveau d'interruption de la MMU
-#define MMU_CMD			0x66	// Registre de commande de la MMU
-#define MMU_FAULT_ADDR	0xCD	// Registre contenant l'adresse mémoire ayant provoqué une faute
-#define TLB_ADD_ENTRY	0xCE
-#define TLB_DEL_ENTRY 	0xDE	// Registre de commande de suppression d'entrée dans la TLB
-
 /**
  * CMD_
  * commandes ATA-2
@@ -33,11 +25,23 @@
 #define CMD_MANUF       0xA2
 #define CMD_DIAG        0xA4
 
+#define MMU_IRQ 13		
+#define MMU_CMD		 0x66			
+#define MMU_FAULT_ADDR	0xCD	
+#define TLB_ADD_ENTRY	 0xCE			
+#define TLB_DEL_ENTRY	 0xDE		
+#define TLB_SIZE	32		
+#define TLB_ENTRIES	0x800
+
+
+
+
 /**
  * Commandes de la MMU (registre MMU_CMD)
  */
 #define MMU_PROCESS	0xCC	/* Commande d'activation/désactivation de la MMU */
 #define MMU_RESET	0xD5	/* Commande de réinitialisation de la MMU */
+
 
 /**
  * Physical and virtual memory for MMU

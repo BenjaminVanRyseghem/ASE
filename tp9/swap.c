@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "hardware.h"
+#include "include/hardware.h"
 #include "swap.h"
 
 static FILE *swap_file;
