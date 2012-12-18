@@ -1,5 +1,3 @@
-#define PAGE_SIZE 4
-
 #define PM_PAGES 256 // 1<<8
 #define PM_SIZE PAGE_SIZE*PM_PAGES
 #define BEGIN_PMEM *(int*)&physical_memory

@@ -24,4 +24,4 @@ clean:
 	rm -rf *.o *.dSYM
 
 realclean: clean
-	rm -rf mmuhandler
+	rm -rf mmuhandler mi_kernel

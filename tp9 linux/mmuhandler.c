@@ -30,9 +30,20 @@ struct tlb_entry_s global_tlb;
 unsigned current_vpage = -1;
 unsigned current_ppage = -1;
 
+int default_page_number = 0;
+
+void print_default_page(){
+	printf("Default page number : %d\n",default_page_number);
+}
+
+void reset_default_page(){
+	default_page_number = 0;
+}
+
 void mmuhandler() {
 	// on recupere : vaddr, vpage
 	unsigned vaddr, vpage, ppage;
+	default_page_number++;
 	
 	vaddr = _in(MMU_FAULT_ADDR);
 	

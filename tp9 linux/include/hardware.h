@@ -25,6 +25,11 @@
 #define CMD_MANUF       0xA2
 #define CMD_DIAG        0xA4
 
+#define DFT_PAG		0xA6
+#define RST_DFT_PAG	0xA8
+
+#define PAGE_SIZE 4096
+
 
 #define MMU_IRQ 13		
 #define MMU_CMD		 0x66			
